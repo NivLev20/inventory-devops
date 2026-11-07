@@ -17,9 +17,15 @@ inventory-devops/
 │   ├── 50-simulator.yaml       CronJobs simulating store activity (sales, deliveries, new products)
 │   ├── 60-hpa.yaml             HorizontalPodAutoscaler for the backend (2-5 pods)
 │   └── 70-backup.yaml          Nightly pg_dump backup CronJob with 7-day retention
+├── Jenkinsfile                 CI/CD pipeline
+├── jenkins/
+│   ├── Dockerfile              Jenkins controller with docker CLI, kubectl, helm, Python, Node
+│   └── plugins.txt             Plugins baked into the image
 ├── scripts/
 │   ├── create-secret.sh        Creates the database Secret with a random password
-│   └── restore-backup.sh       Lists backups / restores the database from a backup
+│   ├── restore-backup.sh       Lists backups / restores the database from a backup
+│   ├── smoke-test.sh           API test against the live deployment (used by the pipeline)
+│   └── start-jenkins.sh        Builds and starts Jenkins, writes its kubeconfig
 ├── tools/
 │   └── load-generator.yaml     On-demand load for the autoscaling demo (not deployed by default)
 └── examples/
@@ -59,6 +65,39 @@ kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
 ```
 
 Then browse to http://inventory.local:8080 (add `127.0.0.1 inventory.local` to the hosts file).
+
+## CI/CD pipeline
+
+Jenkins polls both repositories every two minutes. A new commit in `inventory-app` runs:
+
+| Stage | What it does |
+|---|---|
+| Checkout | Clones `inventory-app`; the image tag is the app commit SHA |
+| Lint | flake8 (backend) and ESLint (frontend), in parallel |
+| Unit tests | pytest, results published as JUnit reports |
+| Build images | Backend and frontend images tagged with the commit SHA |
+| Security scan | Trivy; the build stops on fixable CRITICAL vulnerabilities, before anything is pushed |
+| Push images | Docker Hub, logging in with an access token stored as a Jenkins credential |
+| Deploy | Applies `k8s/` with the new tag and waits for the rollouts to become healthy |
+| Monitoring | Installs/updates kube-prometheus-stack with Helm (when `monitoring/values.yaml` is present) |
+| API tests | `scripts/smoke-test.sh` against the live Ingress: create, sell, reject oversell, delete |
+
+If anything fails after the deploy, the pipeline rolls the backend and frontend back to the previous version.
+
+### Running Jenkins locally
+
+```bash
+./scripts/start-jenkins.sh
+```
+
+Jenkins listens on http://localhost:8081 (bound to localhost only). Credentials to create in Jenkins:
+
+| ID | Type | Value |
+|---|---|---|
+| `dockerhub` | Username with password | Docker Hub user and an access token (Read & Write) |
+| `minikube-kubeconfig` | Secret file | `~/jenkins-kubeconfig`, written by the start script |
+
+**Lab-only shortcuts.** The Jenkins container mounts the host Docker socket and uses the Minikube admin kubeconfig. Both are acceptable on a single-user laptop, but give the pipeline full control of the host and cluster. In production the builds would run on isolated agents, images would be built with a daemonless tool such as Kaniko or BuildKit, and the pipeline would deploy with a namespace-scoped ServiceAccount.
 
 ## Demo scenarios
 
