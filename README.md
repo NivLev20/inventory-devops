@@ -13,9 +13,15 @@ inventory-devops/
 │   ├── 10-postgres.yaml        PostgreSQL StatefulSet + persistent volume + internal Service
 │   ├── 20-backend.yaml         Flask API Deployment (2 replicas) + Service
 │   ├── 30-frontend.yaml        React/nginx Deployment + Service
-│   └── 40-ingress.yaml         Ingress for http://inventory.local
+│   ├── 40-ingress.yaml         Ingress for http://inventory.local
+│   ├── 50-simulator.yaml       CronJobs simulating store activity (sales, deliveries, new products)
+│   ├── 60-hpa.yaml             HorizontalPodAutoscaler for the backend (2-5 pods)
+│   └── 70-backup.yaml          Nightly pg_dump backup CronJob with 7-day retention
 ├── scripts/
-│   └── create-secret.sh        Creates the database Secret with a random password
+│   ├── create-secret.sh        Creates the database Secret with a random password
+│   └── restore-backup.sh       Lists backups / restores the database from a backup
+├── tools/
+│   └── load-generator.yaml     On-demand load for the autoscaling demo (not deployed by default)
 └── examples/
     └── secret.example.yaml     Secret format reference (placeholders only, never applied)
 ```
@@ -54,6 +60,39 @@ kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
 
 Then browse to http://inventory.local:8080 (add `127.0.0.1 inventory.local` to the hosts file).
 
+## Demo scenarios
+
+**Self-healing** – delete a backend pod; the other replica keeps serving while Kubernetes replaces it:
+
+```bash
+kubectl delete pod -n inventory -l app=backend --wait=false
+kubectl get pods -n inventory -l app=backend -w
+```
+
+**Live store activity** – the simulator CronJobs sell products every minute and launch a new product every two minutes:
+
+```bash
+kubectl get cronjobs -n inventory
+kubectl logs -n inventory -l app=simulator --tail=20
+```
+
+**Autoscaling** – generate load and watch the backend scale from 2 to 5 pods, then back down:
+
+```bash
+kubectl apply -f tools/load-generator.yaml
+kubectl get hpa backend -n inventory -w
+kubectl delete -f tools/load-generator.yaml
+```
+
+**Backup and restore**:
+
+```bash
+kubectl create job backup-now --from=cronjob/postgres-backup -n inventory
+kubectl logs -n inventory job/backup-now
+./scripts/restore-backup.sh                          # list backups
+./scripts/restore-backup.sh inventory-XXXX.sql.gz    # restore one
+```
+
 ## Design decisions
 
 | Topic | Decision |
@@ -66,6 +105,9 @@ Then browse to http://inventory.local:8080 (add `127.0.0.1 inventory.local` to t
 | Resources | Every container has CPU and memory requests and limits. |
 | Pod security | Namespace enforces the `baseline` Pod Security Standard and warns on `restricted`. Backend and frontend run as non-root with all capabilities dropped; the backend root filesystem is read-only. |
 | Images | Pinned to the Git commit SHA, never `latest`. |
+| Scaling | HPA scales the backend on CPU (70% of request), 2 to 5 replicas, 60s scale-down window. |
+| Backups | Daily `pg_dump` to a dedicated volume, 7 newest kept, scripted restore. |
+| Demo data | Simulator CronJobs use the public API only, with `concurrencyPolicy: Forbid` and a bounded catalog. |
 
 ## Useful commands
 

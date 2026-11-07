@@ -1,0 +1,91 @@
+# Store activity simulator: two CronJobs that use the backend image and call the REST API.
+#   simulate-sales         every minute    -> customer purchases + supplier deliveries for sold-out items
+#   simulate-new-products  every 2 minutes -> launches the next product from a fixed catalog (16 items, then stops)
+# Pause them any time:  kubectl patch cronjob <name> -n inventory -p '{"spec":{"suspend":true}}'
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: simulate-sales
+  namespace: inventory
+  labels:
+    app: simulator
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid          # never run two simulations at the same time
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 50
+      template:
+        metadata:
+          labels:
+            app: simulator
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: simulator
+              image: docker.io/nivlev20/inventory-backend:fbf8c60
+              command: ["python", "simulator.py", "sales"]
+              env:
+                - name: SIM_API_URL
+                  value: "http://backend:5000"
+              resources:
+                requests: { cpu: 20m, memory: 32Mi }
+                limits: { cpu: 100m, memory: 64Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: simulate-new-products
+  namespace: inventory
+  labels:
+    app: simulator
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 50
+      template:
+        metadata:
+          labels:
+            app: simulator
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: simulator
+              image: docker.io/nivlev20/inventory-backend:fbf8c60
+              command: ["python", "simulator.py", "new-product"]
+              env:
+                - name: SIM_API_URL
+                  value: "http://backend:5000"
+              resources:
+                requests: { cpu: 20m, memory: 32Mi }
+                limits: { cpu: 100m, memory: 64Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
