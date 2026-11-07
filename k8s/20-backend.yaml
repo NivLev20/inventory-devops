@@ -53,7 +53,13 @@ spec:
           type: RuntimeDefault
       containers:
         - name: backend
-          image: docker.io/nivlev20/inventory-backend:82e009b
+          # Keep serving for a few seconds after shutdown starts, until the Service has
+          # stopped routing to this pod. Prevents dropped requests during rolling updates.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          image: docker.io/nivlev20/inventory-backend:8611bf8
           ports:
             - containerPort: 5000
           env:
