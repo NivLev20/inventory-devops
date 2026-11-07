@@ -36,6 +36,16 @@ else
   echo "Port forward started in the background (log: $LOG)."
 fi
 
+# Wait until port 8080 actually answers before announcing the URLs
+for _ in $(seq 1 30); do
+  if curl -s -o /dev/null --max-time 2 http://localhost:8080/; then break; fi
+  sleep 1
+done
+if ! curl -s -o /dev/null --max-time 2 http://localhost:8080/; then
+  echo "Port 8080 is not answering yet - check $LOG"
+  exit 1
+fi
+
 echo
 echo "App:      http://inventory.local:8080"
 echo "Grafana:  http://grafana.local:8080"
