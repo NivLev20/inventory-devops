@@ -32,7 +32,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: simulator
-              image: docker.io/nivlev20/inventory-backend:fbf8c60
+              image: docker.io/nivlev20/inventory-backend:38168f3
               command: ["python", "simulator.py", "sales"]
               env:
                 - name: SIM_API_URL
@@ -76,7 +76,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: simulator
-              image: docker.io/nivlev20/inventory-backend:fbf8c60
+              image: docker.io/nivlev20/inventory-backend:38168f3
               command: ["python", "simulator.py", "new-product"]
               env:
                 - name: SIM_API_URL
