@@ -1,0 +1,13 @@
+# ConfigMap: non-secret settings, injected into the pods as environment variables.
+# Passwords never go here - they live in the "inventory-secrets" Secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-config
+  namespace: inventory
+data:
+  APP_ENV: "minikube"
+  SEED_DATA: "true"                      # load demo products when the database is empty
+  BACKEND_URL: "http://backend:5000"     # where the frontend nginx proxies /api (Service DNS name)
+  POSTGRES_DB: "inventory"
+  POSTGRES_USER: "inventory"

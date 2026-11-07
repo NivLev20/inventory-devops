@@ -1,0 +1,94 @@
+# Flask API.
+# - 2 replicas: if one pod dies, the other keeps serving while Kubernetes replaces it.
+# - Probes: startup (give it time to connect to the DB), liveness (/health), readiness (/ready).
+# - Hardened: non-root user, read-only root filesystem, no Linux capabilities.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: inventory
+  labels:
+    app: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: inventory
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0     # never drop below 2 ready pods during an update
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: backend
+      annotations:
+        # Prometheus will use these in stage 7 to find the metrics endpoint
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000          # "appuser" created in the backend Dockerfile
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend
+          image: docker.io/nivlev20/inventory-backend:fbf8c60
+          ports:
+            - containerPort: 5000
+          env:
+            - name: APP_ENV
+              valueFrom:
+                configMapKeyRef: { name: inventory-config, key: APP_ENV }
+            - name: SEED_DATA
+              valueFrom:
+                configMapKeyRef: { name: inventory-config, key: SEED_DATA }
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: inventory-secrets, key: DATABASE_URL }
+          startupProbe:
+            httpGet: { path: /health, port: 5000 }
+            periodSeconds: 5
+            failureThreshold: 30     # up to 150s to start (waits for the database)
+          livenessProbe:
+            httpGet: { path: /health, port: 5000 }
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /ready, port: 5000 }
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp                # gunicorn needs a writable /tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

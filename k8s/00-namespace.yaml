@@ -1,0 +1,12 @@
+# Namespace: a separate "folder" in the cluster for everything in this project.
+# Pod Security Admission:
+#   enforce=baseline  -> blocks dangerous pods (privileged, host network, host paths...)
+#   warn=restricted   -> prints a warning for anything below the strictest profile
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inventory
+  labels:
+    app.kubernetes.io/part-of: smart-retail-inventory
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted

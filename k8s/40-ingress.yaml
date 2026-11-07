@@ -1,0 +1,20 @@
+# Ingress: the single entry point from outside the cluster.
+# Requests for http://inventory.local go to the frontend Service; nginx inside it sends /api to the backend.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: inventory
+  namespace: inventory
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: inventory.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 8080
