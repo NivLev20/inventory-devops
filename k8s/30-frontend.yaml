@@ -41,7 +41,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: frontend
-          image: docker.io/nivlev20/inventory-frontend:38168f3
+          image: docker.io/nivlev20/inventory-frontend:82e009b
           ports:
             - containerPort: 8080
           env:
