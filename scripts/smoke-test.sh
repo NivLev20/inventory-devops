@@ -15,11 +15,15 @@ field() {
   python3 -c "import json,sys; print(json.load(sys.stdin)['$1'])"
 }
 
-echo "== waiting for the API behind the Ingress"
-for i in $(seq 1 30); do
-  if api "$BASE/api/products/analytics" >/dev/null 2>&1; then break; fi
-  [ "$i" -eq 30 ] && { echo "API not reachable at $BASE"; exit 1; }
-  sleep 2
+# Right after a rollout, the Ingress and Services may still route to pods that are gone
+# for a few seconds. Wait for 5 consecutive good answers before changing any data.
+echo "== waiting for the API behind the Ingress to be stable"
+OK=0
+for i in $(seq 1 60); do
+  if api "$BASE/api/products/analytics" >/dev/null 2>&1; then OK=$((OK + 1)); else OK=0; fi
+  [ "$OK" -ge 5 ] && break
+  [ "$i" -eq 60 ] && { echo "API not stable at $BASE"; exit 1; }
+  sleep 1
 done
 
 ID=""
