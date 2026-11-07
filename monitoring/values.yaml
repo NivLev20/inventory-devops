@@ -1,0 +1,63 @@
+# kube-prometheus-stack, sized for a 4 GB Minikube.
+# Installed by the Jenkins "Monitoring" stage via scripts/install-monitoring.sh.
+
+# No external notification channel in this project; Grafana handles the dashboards
+alertmanager:
+  enabled: false
+
+# Minikube runs these control-plane components in a way the default scrape config
+# cannot reach, which only produces "target down" noise
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    scrapeInterval: 30s
+    # Pick up ServiceMonitors from every namespace, not only ones labelled for this Helm release
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 200m, memory: 400Mi }
+      limits: { cpu: "1", memory: 1Gi }
+
+prometheusOperator:
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 200m, memory: 192Mi }
+
+grafana:
+  # Admin login comes from a Secret created by the install script, never from Git
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  # Dashboards are code (ConfigMaps in monitoring/manifests), so no persistent volume is needed
+  persistence:
+    enabled: false
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+  resources:
+    requests: { cpu: 100m, memory: 160Mi }
+    limits: { cpu: 500m, memory: 384Mi }
+
+kube-state-metrics:
+  resources:
+    requests: { cpu: 20m, memory: 48Mi }
+    limits: { cpu: 100m, memory: 128Mi }
+
+prometheus-node-exporter:
+  # Docker Desktop / Minikube do not support the host root mount propagation the exporter wants
+  hostRootFsMount:
+    enabled: false
+  resources:
+    requests: { cpu: 20m, memory: 24Mi }
+    limits: { cpu: 100m, memory: 64Mi }

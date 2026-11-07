@@ -11,7 +11,7 @@ pipeline {
         timestamps()
         disableConcurrentBuilds()
         buildDiscarder(logRotator(numToKeepStr: '15'))
-        timeout(time: 45, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
     }
 
     // GitHub cannot reach a laptop, so poll instead of using a webhook
@@ -154,14 +154,7 @@ pipeline {
             when { expression { fileExists('monitoring/values.yaml') } }
             steps {
                 withCredentials([file(credentialsId: 'minikube-kubeconfig', variable: 'KUBECONFIG')]) {
-                    sh '''
-                        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
-                        helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
-                            -n monitoring --create-namespace \
-                            -f monitoring/values.yaml \
-                            --wait --timeout 10m
-                        if [ -d monitoring/manifests ]; then kubectl apply -f monitoring/manifests/; fi
-                    '''
+                    sh './scripts/install-monitoring.sh'
                 }
             }
         }

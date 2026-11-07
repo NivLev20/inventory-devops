@@ -18,6 +18,9 @@ inventory-devops/
 │   ├── 60-hpa.yaml             HorizontalPodAutoscaler for the backend (2-5 pods)
 │   └── 70-backup.yaml          Nightly pg_dump backup CronJob with 7-day retention
 ├── Jenkinsfile                 CI/CD pipeline
+├── monitoring/
+│   ├── values.yaml             kube-prometheus-stack settings (Prometheus + Grafana)
+│   └── manifests/              ServiceMonitor for the backend, Grafana dashboard as code
 ├── jenkins/
 │   ├── Dockerfile              Jenkins controller with docker CLI, kubectl, helm, Python, Node
 │   └── plugins.txt             Plugins baked into the image
@@ -25,6 +28,7 @@ inventory-devops/
 │   ├── create-secret.sh        Creates the database Secret with a random password
 │   ├── restore-backup.sh       Lists backups / restores the database from a backup
 │   ├── smoke-test.sh           API test against the live deployment (used by the pipeline)
+│   ├── install-monitoring.sh   Installs/updates Prometheus + Grafana (used by the pipeline)
 │   └── start-jenkins.sh        Builds and starts Jenkins, writes its kubeconfig
 ├── tools/
 │   └── load-generator.yaml     On-demand load for the autoscaling demo (not deployed by default)
@@ -98,6 +102,25 @@ Jenkins listens on http://localhost:8081 (bound to localhost only). Credentials 
 | `minikube-kubeconfig` | Secret file | `~/jenkins-kubeconfig`, written by the start script |
 
 **Lab-only shortcuts.** The Jenkins container mounts the host Docker socket and uses the Minikube admin kubeconfig. Both are acceptable on a single-user laptop, but give the pipeline full control of the host and cluster. In production the builds would run on isolated agents, images would be built with a daemonless tool such as Kaniko or BuildKit, and the pipeline would deploy with a namespace-scoped ServiceAccount.
+
+## Monitoring
+
+The pipeline installs kube-prometheus-stack into the `monitoring` namespace. Prometheus scrapes the backend's `/metrics` every 15 seconds through a ServiceMonitor; the "Smart Retail Inventory" Grafana dashboard is loaded from a ConfigMap.
+
+| Dashboard row | Panels |
+|---|---|
+| Store | Low-stock and sold-out products, units sold today, units on shelves, stock value |
+| API | Requests per second, p50/p95 response time, 5xx error rate |
+| Kubernetes | CPU and memory per pod, backend replicas (HPA) |
+
+Open Grafana:
+
+```bash
+kubectl port-forward -n monitoring service/monitoring-grafana 3000:80
+kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
+
+Browse to http://localhost:3000 and log in as `admin`.
 
 ## Demo scenarios
 
