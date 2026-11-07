@@ -30,6 +30,7 @@ inventory-devops/
 │   ├── smoke-test.sh           API test against the live deployment (used by the pipeline)
 │   ├── install-monitoring.sh   Installs/updates Prometheus + Grafana (used by the pipeline)
 │   ├── start-jenkins.sh        Builds and starts Jenkins, writes its kubeconfig
+│   ├── bootstrap.sh            One-command install on a fresh machine (no Jenkins needed)
 │   ├── dev-up.sh               Starts Minikube, Jenkins and the port forward after a reboot
 │   └── dev-down.sh             Stops the port forward (--all: also Jenkins and Minikube)
 ├── tools/
@@ -37,6 +38,47 @@ inventory-devops/
 └── examples/
     └── secret.example.yaml     Secret format reference (placeholders only, never applied)
 ```
+
+## Requirements coverage
+
+Course project #1, "Smart Retail Inventory System". Paths starting with `inventory-app/` are in the application repository; all others are in this repository.
+
+| Requirement | Implementation |
+|---|---|
+| Flask REST API: product CRUD, restocking | `inventory-app/backend/app.py` — all 9 endpoints from the brief, plus `/health`, `/ready`, `/metrics` |
+| Stock analytics and trends | `GET /api/products/low-stock`, `GET /api/products/analytics` |
+| React frontend with charts (optional) | `inventory-app/frontend/src/` — React 18, Vite, Chart.js |
+| PostgreSQL: products, stock levels, restock logs | `inventory-app/backend/db.py` — `products`, `stock_history`, `restock_logs` (+ `sales`, `settings`) |
+| Separate Dockerfiles | `inventory-app/backend/Dockerfile`, `inventory-app/frontend/Dockerfile` (multi-stage) |
+| docker-compose for local development (optional) | `inventory-app/docker-compose.yml` |
+| ConfigMaps | `k8s/01-configmap.yaml` |
+| Secrets for PostgreSQL credentials | `scripts/create-secret.sh` (random password, never in Git); format in `examples/secret.example.yaml` |
+| Deployments for Flask, React, PostgreSQL | `k8s/20-backend.yaml`, `k8s/30-frontend.yaml`; PostgreSQL uses a StatefulSet (`k8s/10-postgres.yaml`) for a stable identity and persistent volume |
+| Services | ClusterIP Services in `k8s/10-*`, `k8s/20-*`, `k8s/30-*` |
+| Ingress | `k8s/40-ingress.yaml` (app), `monitoring/manifests/grafana-ingress.yaml` (Grafana) |
+| Prometheus: API response times, container resources | `monitoring/values.yaml`, `monitoring/manifests/servicemonitor.yaml` |
+| Grafana: stock trends and API latency | `monitoring/manifests/dashboard.yaml` (dashboard as code) |
+| Split Git repositories | `inventory-app` (code, Dockerfiles) and `inventory-devops` (manifests, Jenkinsfile, monitoring) |
+| CI/CD: lint Flask and React | `Jenkinsfile` stage *Lint* (flake8, ESLint in parallel) |
+| CI/CD: unit tests | Stage *Unit tests* — 26 pytest tests, JUnit report |
+| CI/CD: build and push to Docker Hub | Stages *Build images*, *Push images* — tagged with the app commit SHA |
+| CI/CD: deploy to Minikube | Stage *Deploy* — `kubectl apply` and rollout checks |
+| CI/CD: run Prometheus and Grafana | Stage *Monitoring* — `scripts/install-monitoring.sh` (Helm) |
+| CI/CD: API testing on the live deployment | Stage *API tests* — `scripts/smoke-test.sh` through the Ingress |
+| Automatic deploys with health checks | Poll every minute; liveness/readiness/startup probes; `rollout status`; automatic rollback on failure |
+
+**Beyond the brief:** Trivy image scanning that blocks the push, HorizontalPodAutoscaler (2–5 backend pods), store-simulator CronJobs controlled from the dashboard, nightly `pg_dump` backups with a scripted restore, graceful shutdown (`preStop`), a startup lock for concurrent replicas, Swagger API docs, Pod Security Admission, non-root containers with dropped capabilities, and a one-command install (`scripts/bootstrap.sh`).
+
+## Try it on your machine
+
+With Docker, Minikube, kubectl and Helm installed:
+
+```bash
+git clone <this repository> inventory-devops && cd inventory-devops
+./scripts/bootstrap.sh
+```
+
+The script starts Minikube, deploys the latest published images from Docker Hub, installs monitoring and opens access on port 8080. It takes about 10 minutes the first time (image downloads). Jenkins is not needed for this.
 
 ## Architecture
 

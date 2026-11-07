@@ -14,7 +14,8 @@ if ! minikube status --format '{{.Host}}' 2>/dev/null | grep -q Running; then
   minikube start
 fi
 
-if [ "$(docker inspect -f '{{.State.Running}}' jenkins 2>/dev/null)" != "true" ]; then
+# Jenkins is optional (a fresh install from bootstrap.sh has none)
+if docker inspect jenkins >/dev/null 2>&1 && [ "$(docker inspect -f '{{.State.Running}}' jenkins)" != "true" ]; then
   docker start jenkins >/dev/null
   echo "Jenkins started."
 fi
