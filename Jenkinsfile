@@ -16,7 +16,7 @@ pipeline {
 
     // GitHub cannot reach a laptop, so poll instead of using a webhook
     triggers {
-        pollSCM('H/2 * * * *')
+        pollSCM('* * * * *')
     }
 
     parameters {
