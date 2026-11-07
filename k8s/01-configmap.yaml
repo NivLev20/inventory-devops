@@ -8,6 +8,7 @@ metadata:
 data:
   APP_ENV: "minikube"
   SEED_DATA: "true"                      # load demo products when the database is empty
-  BACKEND_URL: "http://backend:5000"     # where the frontend nginx proxies /api (Service DNS name)
+  # Full service name: the frontend nginx resolves it per request, without DNS search domains
+  BACKEND_URL: "http://backend.inventory.svc.cluster.local:5000"
   POSTGRES_DB: "inventory"
   POSTGRES_USER: "inventory"
