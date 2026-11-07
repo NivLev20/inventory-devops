@@ -20,7 +20,7 @@ inventory-devops/
 ├── Jenkinsfile                 CI/CD pipeline
 ├── monitoring/
 │   ├── values.yaml             kube-prometheus-stack settings (Prometheus + Grafana)
-│   └── manifests/              ServiceMonitor for the backend, Grafana dashboard as code
+│   └── manifests/              ServiceMonitor, Grafana dashboard as code, Grafana Ingress
 ├── jenkins/
 │   ├── Dockerfile              Jenkins controller with docker CLI, kubectl, helm, Python, Node
 │   └── plugins.txt             Plugins baked into the image
@@ -29,7 +29,9 @@ inventory-devops/
 │   ├── restore-backup.sh       Lists backups / restores the database from a backup
 │   ├── smoke-test.sh           API test against the live deployment (used by the pipeline)
 │   ├── install-monitoring.sh   Installs/updates Prometheus + Grafana (used by the pipeline)
-│   └── start-jenkins.sh        Builds and starts Jenkins, writes its kubeconfig
+│   ├── start-jenkins.sh        Builds and starts Jenkins, writes its kubeconfig
+│   ├── dev-up.sh               Starts Minikube, Jenkins and the port forward after a reboot
+│   └── dev-down.sh             Stops the port forward (--all: also Jenkins and Minikube)
 ├── tools/
 │   └── load-generator.yaml     On-demand load for the autoscaling demo (not deployed by default)
 └── examples/
@@ -62,13 +64,21 @@ kubectl apply -f k8s/
 kubectl get pods -n inventory -w
 ```
 
-Open the app (keep this running in its own terminal):
+## Daily use
+
+After a reboot, one command brings everything back:
 
 ```bash
-kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
+./scripts/dev-up.sh
 ```
 
-Then browse to http://inventory.local:8080 (add `127.0.0.1 inventory.local` to the hosts file).
+| Service | URL |
+|---|---|
+| App | http://inventory.local:8080 |
+| Grafana | http://grafana.local:8080 |
+| Jenkins | http://localhost:8081 |
+
+Both `.local` names resolve through the hosts file (`127.0.0.1 inventory.local grafana.local`). A single background port-forward to the Ingress controller serves both; Grafana and the app are routed by host name. `./scripts/dev-down.sh` stops it, `./scripts/dev-down.sh --all` also stops Jenkins and Minikube.
 
 ## CI/CD pipeline
 
@@ -113,14 +123,11 @@ The pipeline installs kube-prometheus-stack into the `monitoring` namespace. Pro
 | API | Requests per second, p50/p95 response time, 5xx error rate |
 | Kubernetes | CPU and memory per pod, backend replicas (HPA) |
 
-Open Grafana:
+Grafana is at http://grafana.local:8080. Log in as `admin` with the generated password:
 
 ```bash
-kubectl port-forward -n monitoring service/monitoring-grafana 3000:80
 kubectl get secret grafana-admin -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d; echo
 ```
-
-Browse to http://localhost:3000 and log in as `admin`.
 
 ## Demo scenarios
 
