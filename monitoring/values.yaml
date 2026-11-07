@@ -45,9 +45,11 @@ grafana:
     dashboards:
       enabled: true
       label: grafana_dashboard
+  # Below 1 CPU Grafana gets throttled while rendering dashboards, misses its readiness
+  # probe and the Ingress briefly answers 503
   resources:
-    requests: { cpu: 100m, memory: 160Mi }
-    limits: { cpu: 500m, memory: 384Mi }
+    requests: { cpu: 100m, memory: 192Mi }
+    limits: { cpu: "1", memory: 512Mi }
 
 kube-state-metrics:
   resources:
