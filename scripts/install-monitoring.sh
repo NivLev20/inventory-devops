@@ -31,7 +31,7 @@ else
 fi
 
 helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
-  -n "$NS" -f monitoring/values.yaml "${VERSION_ARGS[@]}" --wait --timeout 20m
+  -n "$NS" -f monitoring/values.yaml ${VERSION_ARGS[@]+"${VERSION_ARGS[@]}"} --wait --timeout 20m
 
 kubectl apply -f monitoring/manifests/
 

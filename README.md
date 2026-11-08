@@ -71,16 +71,54 @@ Course project #1, "Smart Retail Inventory System". Paths starting with `invento
 
 **Beyond the brief:** atomic stock updates (a sale can never push stock below zero, even with concurrent requests), Trivy image scanning that blocks the push, HorizontalPodAutoscaler (2–5 backend pods), store-simulator CronJobs controlled from the dashboard, nightly `pg_dump` backups that are verified before they are kept, with a scripted restore, graceful shutdown (`preStop`), a startup lock for concurrent replicas, Swagger API docs, Pod Security Admission, non-root containers with dropped capabilities, and a one-command install (`scripts/bootstrap.sh`).
 
-## Try it on your machine
+## Run it
 
-With Docker, Minikube, kubectl and Helm installed:
+There are two ways, depending on what you want to see.
+
+| | Just the application | The full DevOps system |
+|---|---|---|
+| What runs | Database, API, dashboard, store simulator | The same, on Kubernetes, with Ingress, autoscaling, backups, Prometheus and Grafana |
+| Needs | Docker | Docker, Minikube, kubectl, Helm (on Windows: inside WSL) |
+| Commands | 3 | 2 after the tools are installed |
+| First run | about 3 minutes | about 10 minutes (image downloads) |
+
+### Just the application (Docker only)
 
 ```bash
-git clone <this repository> inventory-devops && cd inventory-devops
-./scripts/bootstrap.sh
+git clone https://github.com/nivlev20/inventory-app.git
+cd inventory-app
+docker compose up --build -d
 ```
 
-The script starts Minikube, deploys the latest published images from Docker Hub, installs monitoring and opens access on port 8080. It takes about 10 minutes the first time (image downloads). Jenkins is not needed for this.
+Open http://localhost:8080. Stop with `docker compose down`.
+
+### The full DevOps system (Kubernetes)
+
+**1. Install the tools once.**
+
+*Ubuntu / Debian* (on Windows, the same commands inside WSL; skip the Docker line if Docker Desktop is installed):
+
+```bash
+curl -fsSL https://get.docker.com | sh && sudo usermod -aG docker "$USER"   # then log out and in again
+curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -m 0755 kubectl /usr/local/bin/kubectl && rm kubectl
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube && rm minikube-linux-amd64
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+*macOS*: install Docker Desktop, then `brew install minikube kubectl helm`.
+
+**2. Install the system.**
+
+```bash
+git clone https://github.com/nivlev20/inventory-devops.git
+cd inventory-devops && ./scripts/bootstrap.sh
+```
+
+The script starts Minikube, deploys the latest images the pipeline published to Docker Hub, installs monitoring and opens access on port 8080. Jenkins is not needed. At the end it prints the hosts-file line to add and the URLs.
+
+**Remove everything:** `./scripts/dev-down.sh && minikube delete`, then remove the hosts-file line.
 
 ## Architecture
 

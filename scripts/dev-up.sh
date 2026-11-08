@@ -27,11 +27,17 @@ if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
   echo "Port forward already running."
 else
   # kubectl port-forward exits whenever the Ingress pod restarts, so keep it in a retry loop.
-  # setsid gives the loop its own process group, so dev-down.sh can stop it cleanly.
-  setsid bash -c 'while true; do
+  LOOP='while true; do
       kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 8080:80
       sleep 2
-    done' >"$LOG" 2>&1 </dev/null &
+    done'
+  # setsid (Linux) gives the loop its own process group, so dev-down.sh can stop it cleanly.
+  # macOS has no setsid; dev-down.sh then stops the loop and its child directly.
+  if command -v setsid >/dev/null; then
+    setsid bash -c "$LOOP" >"$LOG" 2>&1 </dev/null &
+  else
+    bash -c "$LOOP" >"$LOG" 2>&1 </dev/null &
+  fi
   echo $! > "$PIDFILE"
   echo "Port forward started in the background (log: $LOG)."
 fi
@@ -49,4 +55,4 @@ fi
 echo
 echo "App:      http://inventory.local:8080"
 echo "Grafana:  http://grafana.local:8080"
-echo "Jenkins:  http://localhost:8081"
+if docker inspect jenkins >/dev/null 2>&1; then echo "Jenkins:  http://localhost:8081"; fi

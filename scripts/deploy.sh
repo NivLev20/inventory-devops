@@ -16,7 +16,9 @@ kubectl apply -f k8s/00-namespace.yaml
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 cp k8s/*.yaml "$WORK/"
-sed -i -E "s#(inventory-(backend|frontend)):[0-9a-f]{7,40}#\1:${TAG}#" "$WORK"/*.yaml
+for f in "$WORK"/*.yaml; do  # no "sed -i": its syntax differs between Linux and macOS
+  sed -E "s#(inventory-(backend|frontend)):[0-9a-f]{7,40}#\1:${TAG}#" "$f" > "$f.new" && mv "$f.new" "$f"
+done
 
 # Right after a cluster start the Ingress admission webhook can reject requests briefly
 for attempt in 1 2 3 4 5 6; do

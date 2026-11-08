@@ -46,6 +46,8 @@ spec:
                 - -c
                 - |
                   set -eo pipefail
+                  # After a reboot this job can start before the database (or cluster DNS) is up: wait up to 2 minutes
+                  for i in $(seq 1 24); do pg_isready -q -h postgres && break; sleep 5; done
                   FILE="/backups/inventory-$(date +%Y%m%d-%H%M%S).sql.gz"
                   # Write to a temp name and verify it, so a failed dump never counts as a backup
                   pg_dump -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" | gzip > "$FILE.tmp"

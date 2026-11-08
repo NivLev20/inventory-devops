@@ -5,7 +5,8 @@ set -euo pipefail
 
 PIDFILE="$HOME/.inventory-port-forward.pid"
 if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-  kill -- -"$(cat "$PIDFILE")"
+  PID="$(cat "$PIDFILE")"
+  kill -- -"$PID" 2>/dev/null || { pkill -P "$PID" || true; kill "$PID"; }
   echo "Port forward stopped."
 fi
 rm -f "$PIDFILE"
