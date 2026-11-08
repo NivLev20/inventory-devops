@@ -3,6 +3,8 @@
 Infrastructure for the Smart Retail Inventory system: Kubernetes manifests, CI/CD pipeline and monitoring.
 Application source code lives in the `inventory-app` repository.
 
+![Architecture: Jenkins builds and deploys to Minikube; the app, database, simulator and backups run in the inventory namespace; Prometheus and Grafana in the monitoring namespace](docs/architecture.png)
+
 ## Repository layout
 
 ```
@@ -35,8 +37,10 @@ inventory-devops/
 │   ├── bootstrap.sh            One-command install on a fresh machine (no Jenkins needed)
 │   ├── dev-up.sh               Starts Minikube, Jenkins and the port forward after a reboot
 │   └── dev-down.sh             Stops the port forward (--all: also Jenkins and Minikube)
-└── tools/
-    └── load-generator.yaml     On-demand load for the autoscaling demo (not deployed by default)
+├── tools/
+│   └── load-generator.yaml     On-demand load for the autoscaling demo (not deployed by default)
+└── docs/
+    └── architecture.png        Architecture diagram
 ```
 
 ## Requirements coverage
@@ -117,18 +121,6 @@ cd inventory-devops && ./scripts/bootstrap.sh
 The script starts Minikube, deploys the latest images the pipeline published to Docker Hub, installs monitoring and opens access on port 8080. Jenkins is not needed. At the end it prints the hosts-file line to add and the URLs.
 
 **Remove everything:** `./scripts/dev-down.sh && minikube delete`, then remove the hosts-file line.
-
-## Architecture
-
-```
-Browser -> Ingress (inventory.local) -> frontend Service -> frontend Pod (nginx)
-                                                               | /api
-                                                               v
-                                        backend Service -> backend Pods x2 (Flask)
-                                                               |
-                                                               v
-                                       postgres Service -> postgres Pod -> PersistentVolume
-```
 
 ## Deploy a specific release by hand
 
