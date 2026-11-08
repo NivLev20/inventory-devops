@@ -1,5 +1,4 @@
-# ConfigMap: non-secret settings, injected into the pods as environment variables.
-# Passwords never go here - they live in the "inventory-secrets" Secret.
+# Non-secret settings. Credentials are in the "inventory-secrets" Secret (scripts/create-secret.sh).
 apiVersion: v1
 kind: ConfigMap
 metadata:

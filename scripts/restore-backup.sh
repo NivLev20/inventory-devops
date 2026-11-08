@@ -42,17 +42,29 @@ if [ $# -eq 0 ]; then
 fi
 
 FILE="$1"
-case "$FILE" in
-  inventory-*.sql.gz) ;;
-  *) echo "Expected a file name like inventory-20261107-020000.sql.gz"; exit 1 ;;
-esac
+# Strict name check: the name ends up inside a shell command in the helper pod
+[[ "$FILE" =~ ^inventory-[0-9]{8}-[0-9]{6}\.sql\.gz$ ]] \
+  || { echo "Expected a file name like inventory-20261107-020000.sql.gz"; exit 1; }
 
 read -r -p "This REPLACES the current database with $FILE. Type 'yes' to continue: " ANSWER
 [ "$ANSWER" = "yes" ] || { echo "Cancelled."; exit 1; }
 
-run_in_cluster "set -e; test -f /backups/$FILE; \
-psql -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'; \
-gunzip -c /backups/$FILE | psql -v ON_ERROR_STOP=1 --quiet; echo Restored $FILE"
+# Stop everything that writes to the database while it is being replaced
+echo "Pausing writers (backend and simulator)..."
+kubectl patch cronjob simulate-sales simulate-new-products -n "$NS" -p '{"spec":{"suspend":true}}' >/dev/null
+kubectl patch hpa backend -n "$NS" -p '{"spec":{"minReplicas":1}}' >/dev/null
+kubectl scale deployment/backend -n "$NS" --replicas=0
+kubectl wait --for=delete pod -l app=backend -n "$NS" --timeout=120s || true
 
-echo "Restarting backend pods so they reconnect to the restored database..."
-kubectl rollout restart deployment/backend -n "$NS"
+resume_writers() {
+  echo "Resuming writers..."
+  kubectl scale deployment/backend -n "$NS" --replicas=2
+  kubectl patch hpa backend -n "$NS" -p '{"spec":{"minReplicas":2}}' >/dev/null
+  kubectl patch cronjob simulate-sales simulate-new-products -n "$NS" -p '{"spec":{"suspend":false}}' >/dev/null
+}
+trap resume_writers EXIT
+
+# One transaction (-1): if anything fails, PostgreSQL rolls back and the old data stays
+run_in_cluster "set -e; test -f /backups/$FILE; \
+{ echo 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'; gunzip -c /backups/$FILE; } \
+| psql -1 -v ON_ERROR_STOP=1 --quiet; echo Restored $FILE"

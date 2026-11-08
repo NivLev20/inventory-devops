@@ -15,8 +15,9 @@ fi
 
 PASSWORD="$(openssl rand -hex 24)"
 
-kubectl create secret generic "$SECRET" -n "$NAMESPACE" \
-  --from-literal=POSTGRES_PASSWORD="$PASSWORD" \
-  --from-literal=DATABASE_URL="postgresql://inventory:${PASSWORD}@postgres:5432/inventory"
+# Values go through a pipe (stdin), not command-line arguments visible in "ps"
+printf 'POSTGRES_PASSWORD=%s\nDATABASE_URL=postgresql://inventory:%s@postgres:5432/inventory\n' \
+  "$PASSWORD" "$PASSWORD" \
+  | kubectl create secret generic "$SECRET" -n "$NAMESPACE" --from-env-file=/dev/stdin
 
 echo "Secret '$SECRET' created. The password is stored only inside the cluster."

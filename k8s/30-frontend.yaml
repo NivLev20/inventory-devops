@@ -1,5 +1,4 @@
-# React dashboard served by nginx (unprivileged image, port 8080).
-# nginx proxies /api to the "backend" Service, address taken from the ConfigMap.
+# React dashboard on nginx (non-root, port 8080); /api is proxied to BACKEND_URL from the ConfigMap.
 apiVersion: v1
 kind: Service
 metadata:
@@ -47,7 +46,7 @@ spec:
             preStop:
               exec:
                 command: ["sleep", "5"]
-          image: docker.io/nivlev20/inventory-frontend:8611bf8
+          image: docker.io/nivlev20/inventory-frontend:389ac0b
           ports:
             - containerPort: 8080
           env:

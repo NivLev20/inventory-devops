@@ -1,6 +1,4 @@
-# HorizontalPodAutoscaler: adds backend replicas under load, removes them when load drops.
-# Uses CPU usage from metrics-server (minikube addons enable metrics-server).
-# Target: average 70% of the CPU *request* (100m) -> scale between 2 and 5 pods.
+# Scales the backend between 2 and 5 pods at 70% of its CPU request (needs metrics-server).
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

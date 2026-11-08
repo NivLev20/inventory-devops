@@ -80,7 +80,7 @@ pipeline {
             }
             post {
                 always {
-                    junit 'app/backend/test-results.xml'
+                    junit testResults: 'app/backend/test-results.xml', allowEmptyResults: true
                 }
             }
         }
@@ -133,28 +133,27 @@ pipeline {
         stage('Deploy') {
             steps {
                 withCredentials([file(credentialsId: 'minikube-kubeconfig', variable: 'KUBECONFIG')]) {
-                    sh '''
-                        kubectl apply -f k8s/00-namespace.yaml
-                        ./scripts/create-secret.sh
-
-                        # Manifests in Git keep the last released tag; deploy the tag built here
-                        sed -i -E "s#(inventory-(backend|frontend)):[0-9a-f]{7}#\\1:${TAG}#" k8s/*.yaml
-                        kubectl apply -f k8s/
-
-                        kubectl rollout status deployment/backend  -n "$NAMESPACE" --timeout=180s
-                        kubectl rollout status deployment/frontend -n "$NAMESPACE" --timeout=120s
-                    '''
-                    script { env.DEPLOYED = 'true' }
+                    script {
+                        // Remember the running release, so a failed one can be replaced by exactly it
+                        env.PREVIOUS_TAG = sh(returnStdout: true, script: '''
+                            kubectl get deployment backend -n "$NAMESPACE" \\
+                                -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | sed 's/.*://' || true
+                        ''').trim()
+                        echo "Running now: ${env.PREVIOUS_TAG ?: 'nothing'}, deploying: ${env.TAG}"
+                        env.DEPLOYED = 'true'
+                    }
+                    sh './scripts/deploy.sh "$TAG"'
                 }
             }
         }
 
         stage('Monitoring') {
-            // Enabled once monitoring/values.yaml exists (stage 7 of the project)
-            when { expression { fileExists('monitoring/values.yaml') } }
             steps {
-                withCredentials([file(credentialsId: 'minikube-kubeconfig', variable: 'KUBECONFIG')]) {
-                    sh './scripts/install-monitoring.sh'
+                // A monitoring problem must not roll back a healthy application release
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    withCredentials([file(credentialsId: 'minikube-kubeconfig', variable: 'KUBECONFIG')]) {
+                        sh './scripts/install-monitoring.sh'
+                    }
                 }
             }
         }
@@ -174,19 +173,22 @@ pipeline {
     post {
         failure {
             script {
-                if (env.DEPLOYED == 'true') {
-                    echo 'Deployment failed its checks - rolling back to the previous version'
+                if (env.DEPLOYED == 'true' && env.PREVIOUS_TAG && env.PREVIOUS_TAG != env.TAG) {
+                    echo "Release ${env.TAG} failed - restoring ${env.PREVIOUS_TAG}"
                     withCredentials([file(credentialsId: 'minikube-kubeconfig', variable: 'KUBECONFIG')]) {
-                        sh '''
-                            kubectl rollout undo deployment/backend  -n "$NAMESPACE" || true
-                            kubectl rollout undo deployment/frontend -n "$NAMESPACE" || true
-                        '''
+                        sh './scripts/deploy.sh "$PREVIOUS_TAG"'
                     }
+                } else if (env.DEPLOYED == 'true') {
+                    echo 'No earlier release to restore'
                 }
             }
         }
         success {
             echo "Deployed app version ${env.TAG}"
+        }
+        always {
+            // Old build layers pile up on a laptop; dangling images are safe to remove
+            sh 'docker image prune -f >/dev/null || true'
         }
     }
 }

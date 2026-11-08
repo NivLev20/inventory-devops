@@ -5,7 +5,7 @@
 #   ./scripts/bootstrap.sh --tag 1a2b3c4   # a specific release
 #   ./scripts/bootstrap.sh --no-monitoring # skip Prometheus/Grafana (saves ~1.5 GB RAM)
 #
-# Requirements: Docker, Minikube, kubectl (and Helm for monitoring).
+# Requirements: Docker, Minikube, kubectl, curl, python3, openssl (and Helm for monitoring).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,7 +23,7 @@ done
 step() { printf '\n== %s\n' "$1"; }
 
 step "Checking tools"
-for tool in docker minikube kubectl; do
+for tool in docker minikube kubectl curl python3 openssl; do
   command -v "$tool" >/dev/null || { echo "Missing: $tool"; exit 1; }
 done
 if $MONITORING && ! command -v helm >/dev/null; then
@@ -50,24 +50,7 @@ step "Waiting for the Ingress controller"
 kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=300s
 
 step "Deploying the application"
-kubectl apply -f k8s/00-namespace.yaml
-./scripts/create-secret.sh
-
-# Deploy a copy of the manifests with the chosen tag; the files in Git stay untouched
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
-cp k8s/*.yaml "$WORK/"
-sed -i -E "s#(inventory-(backend|frontend)):[0-9a-f]{7,}#\1:${TAG}#" "$WORK"/*.yaml
-
-# The Ingress admission webhook can reject requests for a short while after startup
-for attempt in 1 2 3 4 5 6; do
-  if kubectl apply -f "$WORK/"; then break; fi
-  [ "$attempt" -eq 6 ] && { echo "kubectl apply kept failing"; exit 1; }
-  echo "Retrying in 10s..."; sleep 10
-done
-kubectl rollout status statefulset/postgres -n inventory --timeout=300s
-kubectl rollout status deployment/backend  -n inventory --timeout=300s
-kubectl rollout status deployment/frontend -n inventory --timeout=300s
+./scripts/deploy.sh "$TAG"
 
 if $MONITORING; then
   step "Installing monitoring (first run downloads ~1 GB of images)"

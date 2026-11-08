@@ -1,7 +1,5 @@
-# Namespace: a separate "folder" in the cluster for everything in this project.
-# Pod Security Admission:
-#   enforce=baseline  -> blocks dangerous pods (privileged, host network, host paths...)
-#   warn=restricted   -> prints a warning for anything below the strictest profile
+# Pod Security Admission: "baseline" is enforced; "restricted" violations only warn,
+# because the official postgres image needs root briefly to prepare its data directory.
 apiVersion: v1
 kind: Namespace
 metadata:

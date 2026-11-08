@@ -1,7 +1,6 @@
-# PostgreSQL database.
-# - StatefulSet (not Deployment): gives the pod a stable identity and its own persistent disk.
-# - volumeClaimTemplates: a 1Gi PersistentVolumeClaim that survives pod deletion and restarts.
-# - Service type ClusterIP: reachable only from inside the cluster, never from outside.
+# PostgreSQL as a StatefulSet: stable identity (postgres-0) and a volume that survives pod
+# replacement. ClusterIP only: reachable from inside the cluster, never from outside.
+# Runs as the image expects: root briefly to prepare the data directory, then the postgres user.
 apiVersion: v1
 kind: Service
 metadata:

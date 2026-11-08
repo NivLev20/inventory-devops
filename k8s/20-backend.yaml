@@ -1,7 +1,4 @@
-# Flask API.
-# - 2 replicas: if one pod dies, the other keeps serving while Kubernetes replaces it.
-# - Probes: startup (give it time to connect to the DB), liveness (/health), readiness (/ready).
-# - Hardened: non-root user, read-only root filesystem, no Linux capabilities.
+# Flask API. Replica count (2-5) is owned by the HorizontalPodAutoscaler in 60-hpa.yaml.
 apiVersion: v1
 kind: Service
 metadata:
@@ -26,7 +23,6 @@ metadata:
   labels:
     app: backend
 spec:
-  replicas: 2
   selector:
     matchLabels:
       app: backend
@@ -39,11 +35,6 @@ spec:
     metadata:
       labels:
         app: backend
-      annotations:
-        # Prometheus will use these in stage 7 to find the metrics endpoint
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "5000"
-        prometheus.io/path: "/metrics"
     spec:
       securityContext:
         runAsNonRoot: true
@@ -59,7 +50,7 @@ spec:
             preStop:
               exec:
                 command: ["sleep", "5"]
-          image: docker.io/nivlev20/inventory-backend:8611bf8
+          image: docker.io/nivlev20/inventory-backend:389ac0b
           ports:
             - containerPort: 5000
           env:

@@ -45,11 +45,14 @@ spec:
                 - sh
                 - -c
                 - |
-                  set -e
+                  set -eo pipefail
                   FILE="/backups/inventory-$(date +%Y%m%d-%H%M%S).sql.gz"
-                  pg_dump -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" | gzip > "$FILE"
+                  # Write to a temp name and verify it, so a failed dump never counts as a backup
+                  pg_dump -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" | gzip > "$FILE.tmp"
+                  gunzip -t "$FILE.tmp"
+                  mv "$FILE.tmp" "$FILE"
                   echo "Backup written: $FILE ($(du -h "$FILE" | cut -f1))"
-                  # Retention: keep the 7 newest backups
+                  # Retention runs only after a verified backup exists: keep the 7 newest
                   ls -1t /backups/inventory-*.sql.gz | tail -n +8 | xargs -r rm -f
                   echo "Backups kept:"; ls -lh /backups
               env:
