@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Restores the database from a backup created by the postgres-backup CronJob.
 #   ./scripts/restore-backup.sh                         -> list available backups
-#   ./scripts/restore-backup.sh inventory-XXXX.sql.gz   -> restore that backup
+#   ./scripts/restore-backup.sh inventory-20261108-020000.sql.gz   -> restore that backup
 # WARNING: a restore REPLACES all current data in the database.
 #
 # How it works: a short-lived pod mounts the backups volume and pipes the dump into

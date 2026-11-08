@@ -1,7 +1,7 @@
 # Store activity simulator: two CronJobs that use the backend image and call the REST API.
 #   simulate-sales         every minute    -> customer purchases + supplier deliveries for sold-out items
 #   simulate-new-products  every 2 minutes -> launches the next product from a fixed catalog (16 items, then stops)
-# Pause them any time:  kubectl patch cronjob <name> -n inventory -p '{"spec":{"suspend":true}}'
+# Pause or resume them from the dashboard (the API keeps a switch the simulator checks on every run).
 apiVersion: batch/v1
 kind: CronJob
 metadata:
